@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KART RUNNER 3D</title>
+<link rel="stylesheet" href="src/fonts.css">
+<link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+<div id="app">
+  <aside class="nav" id="sidebar"></aside>
+  <main class="main" id="main"></main>
+</div>
+<div id="race-layer" hidden>
+  <canvas id="race-canvas"></canvas>
+  <div class="hud" id="hud"></div>
+</div>
+<div id="modal-root"></div>
+
+<script src="lib/three.iife.js"></script>
+<script src="src/00-core.js"></script>
+<script src="src/10-track.js"></script>
+<script src="src/30-physics.js"></script>
+<script src="src/35-ai.js"></script>
+<script src="src/40-render.js"></script>
+<script src="src/50-race.js"></script>
+<script src="src/60-audio.js"></script>
+<script src="src/70-ui.js"></script>
+<script src="src/90-main.js"></script>
+</body>
+</html>
