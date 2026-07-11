@@ -7,6 +7,7 @@ const NAV = [
   { section: 'Race' },
   { id: 'home', label: 'Home' },
   { id: 'lobby', label: 'Quick Match' },
+  { id: 'online', label: 'Friends Room' },
   { id: 'tracks', label: 'Tracks' },
   { id: 'setup', label: 'Setup' },
   { section: 'Career' },
@@ -22,6 +23,7 @@ function navIcon(id) {
   switch (id) {
     case 'home': return svg('M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z');
     case 'lobby': return svg('M13 2L4 14h7l-1 8 9-12h-7z');
+    case 'online': return svg('M2 12h20M12 2c3 3 4.5 6.5 4.5 10S15 19 12 22M12 2c-3 3-4.5 6.5-4.5 10S9 19 12 22', '<circle cx="12" cy="12" r="10"/>');
     case 'tracks': return svg('M5 4h3v16H5zM10 4h2v16h-2zM14 4h6v20h-6z');
     case 'setup': return svg('M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z', '<circle cx="12" cy="12" r="3"/>');
     case 'garage': return svg('M3 21V9l9-6 9 6v12M3 13h18M9 21v-6h6v6');
@@ -60,7 +62,7 @@ function renderSidebar() {
 }
 
 function showScreen(id, arg) {
-  if (screenCleanup) { screenCleanup(); screenCleanup = null; }
+  if (screenCleanup) { screenCleanup(id); screenCleanup = null; }
   currentScreen = id;
   renderSidebar();
   const main = document.getElementById('main');
@@ -122,6 +124,8 @@ SCREENS.home = () => {
       el('h1', {}, 'RACE THE WORLD.'),
       el('p', {}, 'Eight karts, one racing line, zero mercy. Win to climb the ladder — tyres decide everything.'),
       el('button.btn.big.primary', { onclick: () => { SFX.click(); showScreen('lobby'); } }, '⚡ QUICK MATCH'),
+      el('span', { style: { display: 'inline-block', width: '10px' } }),
+      el('button.btn.big.sky', { onclick: () => { SFX.click(); showScreen('online'); } }, '👥 FRIENDS ROOM'),
       el('span', { style: { display: 'inline-block', width: '10px' } }),
       el('button.btn.big.sun', { onclick: () => { SFX.click(); showScreen('training'); } }, 'PRACTICE')),
     el('div.hero-kart', {}, kartSVG(p.color, 1.15)),
@@ -262,6 +266,156 @@ SCREENS.lobby = (arg) => {
             laps >= 5 ? el('span.chip.sky', {}, 'PIT STOPS LIVE') : null),
           weekly ? null : el('button.btn.ghosted', { style: { marginTop: '12px', width: '100%' }, onclick: () => { cleanup(); showScreen('setup'); } }, 'EDIT SETUP')),
         startBtn)));
+};
+
+/* ============================ FRIENDS ROOM ============================ */
+SCREENS.online = () => {
+  const status = el('div');
+  const codeIn = el('input', {
+    type: 'text', maxLength: 4, placeholder: 'CODE',
+    style: { textTransform: 'uppercase', fontFamily: 'var(--mono)', fontSize: '22px', letterSpacing: '6px', textAlign: 'center' },
+  });
+  const busy = msg => { status.innerHTML = ''; status.append(el('span.chip.sun', {}, msg)); };
+  const oops = msg => { status.innerHTML = ''; status.append(el('span.chip.orange', {}, msg)); };
+
+  const createBtn = el('button.btn.big.primary', {
+    onclick: () => {
+      SFX.click(); busy('OPENING ROOM…'); createBtn.disabled = true;
+      NET.createRoom(err => { createBtn.disabled = false; err ? oops(err) : showScreen('room'); });
+    },
+  }, '🏁 CREATE ROOM');
+
+  const joinBtn = el('button.btn.big.sky', {
+    onclick: () => {
+      if (codeIn.value.trim().length < 4) { oops('Enter the 4-letter room code'); return; }
+      SFX.click(); busy('JOINING ' + codeIn.value.toUpperCase() + '…'); joinBtn.disabled = true;
+      NET.joinRoom(codeIn.value, err => { joinBtn.disabled = false; err ? oops(err) : showScreen('room'); });
+    },
+  }, 'JOIN ROOM');
+  codeIn.addEventListener('keydown', e => { if (e.key === 'Enter') joinBtn.click(); });
+
+  return el('div.screen', {},
+    pageHead('FRIENDS ROOM', 'Real multiplayer: your browsers connect directly to each other. Share a 4-letter code, race for the best lap.', 'FRIENDS'),
+    el('div.grid-2', {},
+      el('div.card', {},
+        el('h2.h-section', {}, 'Host a race'),
+        el('p', { style: { fontSize: '13.5px', color: 'var(--ink-3)', margin: '8px 0 16px' } },
+          'You get a room code to share. You pick the track and laps; up to 8 racers. Your browser runs the room — keep this tab open.'),
+        createBtn),
+      el('div.card', {},
+        el('h2.h-section', {}, 'Join a race'),
+        el('p', { style: { fontSize: '13.5px', color: 'var(--ink-3)', margin: '8px 0 16px' } },
+          'Type the code your friend shared. You race with your own kart, colours and assists.'),
+        el('div', { style: { display: 'flex', gap: '10px' } }, codeIn, joinBtn))),
+    status,
+    el('div.card.tight', {},
+      el('div', { style: { fontSize: '12.5px', color: 'var(--ink-3)', lineHeight: 1.7 } },
+        '• Friendly rooms don’t change ELO — history and track PBs still count. ',
+        '• Results and best laps are saved in each player’s own browser. ',
+        '• If a room won’t connect, a firewall may be blocking WebRTC (rare on home networks).')));
+};
+
+SCREENS.room = () => {
+  if (NET.status === 'idle') return SCREENS.online();
+  const meIsHost = NET.isHost;
+
+  // live re-render on room events
+  NET.handlers.onRoster = () => { if (currentScreen === 'room') showScreen('room'); };
+  NET.handlers.onCfg = () => { if (currentScreen === 'room') showScreen('room'); };
+  NET.handlers.onError = msg => { alert(msg); showScreen('online'); };
+  NET.handlers.onClosed = msg => { if (currentScreen === 'room') { alert(msg); showScreen('online'); } };
+  NET.handlers.onStart = msg => {
+    startRace({
+      mode: 'online', trackId: msg.cfg.trackId, laps: msg.cfg.laps,
+      compound: msg.cfg.compound, grid: msg.grid, roster: NET.playerList,
+    });
+  };
+  screenCleanup = nextId => {
+    NET.handlers.onRoster = NET.handlers.onCfg = NET.handlers.onError = NET.handlers.onClosed = NET.handlers.onStart = null;
+    if (nextId !== 'room' && !Race.active && NET.status !== 'racing') NET.leave();
+  };
+
+  const players = NET.playerList;
+  const me = NET.players.get(NET.myId) || {};
+  const tr = TRACKS[NET.cfg.trackId];
+
+  const codeCard = el('div.card', { style: { background: 'var(--yellow)' } },
+    el('div', { style: { display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' } },
+      el('div', {},
+        el('div.eyebrow', {}, meIsHost ? 'YOU ARE HOSTING · SHARE THIS CODE' : 'ROOM CODE'),
+        el('div', { style: { fontFamily: 'var(--display)', fontSize: '52px', letterSpacing: '10px' } }, NET.roomCode)),
+      el('button.btn', {
+        onclick: e => {
+          const btn = e.currentTarget;
+          try { navigator.clipboard.writeText(NET.roomCode); btn.textContent = 'COPIED ✓'; setTimeout(() => btn.textContent = 'COPY CODE', 1500); } catch (err) {}
+        },
+      }, 'COPY CODE'),
+      el('div', { style: { flex: 1 } }),
+      el('button.btn.ghosted', { onclick: () => { NET.leave(); showScreen('online'); } }, 'LEAVE ROOM')));
+
+  const slots = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } });
+  for (let i = 0; i < 8; i++) {
+    const pl = players[i];
+    if (pl) {
+      slots.append(el('div.lobby-slot', { style: pl.id === NET.myId ? { background: 'var(--cream-2)' } : {} },
+        el('span.av', { style: { background: pl.color } }, pl.name[0].toUpperCase()),
+        el('div.grow', {},
+          el('div.name', {}, (pl.clanTag ? '[' + pl.clanTag + '] ' : '') + pl.name + (pl.id === NET.myId ? ' (you)' : '')),
+          el('div.sub', {}, pl.elo + ' ELO' + (i === 0 ? ' · HOST' : ''))),
+        tierChip(pl.elo),
+        i === 0 ? el('span.chip.orange', {}, 'HOST') : (pl.ready ? el('span.chip.grass', {}, 'READY') : el('span.chip.dim', {}, 'NOT READY'))));
+    } else {
+      slots.append(el('div.lobby-slot.empty', {}, 'WAITING FOR RACERS — CODE: ' + NET.roomCode));
+    }
+  }
+
+  // settings — host edits, guests watch
+  const trackChips = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+    ...Object.keys(TRACKS).map(id => el('button.btn' + (NET.cfg.trackId === id ? '.sun' : '.ghosted'), {
+      disabled: !meIsHost,
+      onclick: () => { SFX.click(); NET.setCfg({ trackId: id }); showScreen('room'); },
+    }, TRACKS[id].def.flag + ' ' + TRACKS[id].name)));
+  const lapSeg = el('div.seg', {}, ...[3, 5, 8].map(n =>
+    el('button' + (NET.cfg.laps === n ? '.on' : ''), {
+      disabled: !meIsHost,
+      onclick: () => { SFX.click(); NET.setCfg({ laps: n }); showScreen('room'); },
+    }, n + ' LAPS')));
+  const compSeg = el('div.seg', {}, ...['soft', 'medium', 'hard'].map(c =>
+    el('button' + (NET.cfg.compound === c ? '.on' : ''), {
+      disabled: !meIsHost,
+      onclick: () => { SFX.click(); NET.setCfg({ compound: c }); showScreen('room'); },
+    }, COMPOUNDS[c].name)));
+
+  const guests = players.slice(1);
+  const allReady = guests.length > 0 && guests.every(g => g.ready);
+  let action;
+  if (meIsHost) {
+    action = el('button.btn.big.primary', {
+      disabled: !allReady,
+      onclick: () => { SFX.click(); NET.startRaceAll(); },
+    }, players.length < 2 ? 'WAITING FOR RACERS…' : (allReady ? '🏁 START RACE' : 'WAITING FOR READY…'));
+  } else {
+    action = el('button.btn.big' + (me.ready ? '.grass' : '.sun'), {
+      onclick: e => { SFX.click(); NET.setReady(!me.ready); e.currentTarget.textContent = !me.ready ? '✓ READY — WAITING FOR HOST' : 'TAP WHEN READY'; showScreen('room'); },
+    }, me.ready ? '✓ READY — WAITING FOR HOST' : 'TAP WHEN READY');
+  }
+
+  const pbs = DB.profile.bestLaps[NET.cfg.trackId];
+  return el('div.screen', {},
+    codeCard,
+    el('div.row', {},
+      el('div.card', { style: { flex: 1.3 } },
+        el('h2.h-section', { style: { marginBottom: '12px' } }, 'Racers ' + players.length + '/8'),
+        slots),
+      el('div', { style: { display: 'flex', flexDirection: 'column', gap: '16px' } },
+        el('div.card', {},
+          el('div.eyebrow', { style: { marginBottom: '10px' } }, 'RACE SETTINGS' + (meIsHost ? '' : ' · HOST DECIDES')),
+          el('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+            trackChips,
+            el('div', { style: { display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' } }, lapSeg, compSeg, tyreDot(NET.cfg.compound, 28)),
+            el('div', { style: { fontFamily: 'var(--mono)', fontSize: '10.5px', color: 'var(--ink-3)' } },
+              trackStats(tr) + (pbs ? ' · your PB ' + fmtTime(pbs) : ' · no PB here yet')))),
+        action)));
 };
 
 /* ============================ TRACKS ============================ */
@@ -478,29 +632,58 @@ SCREENS.results = () => {
       el('div.pname', {}, (o.kart.clanTag ? '[' + o.kart.clanTag + '] ' : '') + o.kart.name));
   }));
 
+  const online = s.mode === 'online';
+  // still in the room: keep listening so the host's next race reaches us here
+  if (online && NET.status !== 'idle') {
+    NET.handlers.onStart = msg => startRace({
+      mode: 'online', trackId: msg.cfg.trackId, laps: msg.cfg.laps,
+      compound: msg.cfg.compound, grid: msg.grid, roster: NET.playerList,
+    });
+    NET.handlers.onClosed = m => { if (currentScreen === 'results') showScreen('online'); };
+    screenCleanup = nextId => {
+      NET.handlers.onStart = NET.handlers.onClosed = null;
+      if (nextId !== 'room' && nextId !== 'results' && !Race.active && NET.status !== 'racing') NET.leave();
+    };
+  }
   const dElo = s.eloAfter - s.eloBefore;
   const eloEl = el('span.elo-delta' + (dElo >= 0 ? '.up' : '.down'), {}, (dElo >= 0 ? '+' : '') + dElo);
+  const winner = s.order[0];
 
-  const rows = s.order.map(o => el('tr' + (o.kart.isPlayer ? '.me' : ''), {},
-    el('td', { style: { fontFamily: 'var(--display)', width: '40px' } }, 'P' + o.pos),
-    el('td', {},
-      el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-        el('span.dot', { style: { width: '10px', height: '10px', borderRadius: '50%', border: '2px solid var(--ink)', background: o.kart.color, display: 'inline-block' } }),
-        el('b', {}, (o.kart.clanTag ? '[' + o.kart.clanTag + '] ' : '') + o.kart.name),
-        o.kart.isPlayer ? el('span.chip.sun', {}, 'YOU') : null)),
-    el('td.num', {}, o.kart.elo + ''),
-    el('td.num', {}, fmtTime(o.kart.bestLap ? o.kart.bestLap * 1000 : null)),
-    el('td.num', { style: { fontWeight: 700 } }, '+' + (RACE_PTS[o.pos - 1] || 0))));
+  const rows = s.order.map(o => {
+    let last;
+    if (online) {
+      const gone = o.kart.gone;
+      last = !o.kart.finishT ? (gone ? 'LEFT' : 'DNF')
+        : o.pos === 1 ? fmtTime(o.kart.finishT * 1000)
+          : '+' + (o.kart.finishT - winner.kart.finishT).toFixed(2);
+    } else {
+      last = '+' + (RACE_PTS[o.pos - 1] || 0);
+    }
+    return el('tr' + (o.kart.isPlayer ? '.me' : ''), {},
+      el('td', { style: { fontFamily: 'var(--display)', width: '40px' } }, 'P' + o.pos),
+      el('td', {},
+        el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+          el('span.dot', { style: { width: '10px', height: '10px', borderRadius: '50%', border: '2px solid var(--ink)', background: o.kart.color, display: 'inline-block' } }),
+          el('b', {}, (o.kart.clanTag ? '[' + o.kart.clanTag + '] ' : '') + o.kart.name),
+          o.kart.isPlayer ? el('span.chip.sun', {}, 'YOU') : null)),
+      el('td.num', {}, o.kart.elo + ''),
+      el('td.num', {}, fmtTime(o.kart.bestLap ? o.kart.bestLap * 1000 : null)),
+      el('td.num', { style: { fontWeight: 700 } }, last));
+  });
 
   const p = DB.profile;
   return el('div.screen.race-fade', {},
     pageHead(s.pos === 1 ? 'VICTORY!' : 'P' + s.pos + ' — ' + tr.name.toUpperCase(),
-      s.mode === 'weekly' ? 'Weekly challenge · ' + s.laps + ' laps' : 'Ranked · ' + s.laps + ' laps',
+      (online ? 'Friends room · ' : s.mode === 'weekly' ? 'Weekly challenge · ' : 'Ranked · ') + s.laps + ' laps',
       s.pos === 1 ? 'VICTORY!' : null),
     el('div.card', {}, podium),
     el('div.grid-3', {},
-      el('div.stat', {}, el('div.v', {}, eloEl, ' ', el('span', { style: { fontSize: '18px' } }, '→ ' + s.eloAfter)), el('div.l', {}, 'ELO · ' + tierOf(s.eloAfter).label)),
-      el('div.stat', {}, el('div.v', {}, '+' + s.pts), el('div.l', {}, 'SEASON POINTS')),
+      online
+        ? el('div.stat', {}, el('div.v', {}, fmtTime(s.bestLap ? s.bestLap * 1000 : null)), el('div.l', {}, 'YOUR BEST LAP' + (s.trackPB ? ' · NEW PB!' : '')))
+        : el('div.stat', {}, el('div.v', {}, eloEl, ' ', el('span', { style: { fontSize: '18px' } }, '→ ' + s.eloAfter)), el('div.l', {}, 'ELO · ' + tierOf(s.eloAfter).label)),
+      online
+        ? el('div.stat', {}, el('div.v', {}, s.n + ''), el('div.l', {}, 'RACERS IN ROOM'))
+        : el('div.stat', {}, el('div.v', {}, '+' + s.pts), el('div.l', {}, 'SEASON POINTS')),
       el('div.stat', {}, el('div.v', {}, '+' + s.xp + ' XP' + (s.levelUps ? ' ★' : '')), el('div.l', {}, s.levelUps ? 'LEVEL UP! +1 SKILL POINT' : p.xp + '/' + xpForLevel(p.level) + ' TO LVL ' + (p.level + 1)))),
     s.fastest ? el('div.card.tight', {},
       el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' } },
@@ -510,10 +693,12 @@ SCREENS.results = () => {
         s.trackPB ? el('span.chip.grass', {}, 'NEW TRACK PB') : null)) : null,
     el('div.card', {},
       el('table.tt', {},
-        el('thead', {}, el('tr', {}, el('th', {}, 'Pos'), el('th', {}, 'Driver'), el('th', {}, 'ELO'), el('th', {}, 'Best lap'), el('th', {}, 'Pts'))),
+        el('thead', {}, el('tr', {}, el('th', {}, 'Pos'), el('th', {}, 'Driver'), el('th', {}, 'ELO'), el('th', {}, 'Best lap'), el('th', {}, online ? 'Time' : 'Pts'))),
         el('tbody', {}, rows))),
     el('div', { style: { display: 'flex', gap: '10px', flexWrap: 'wrap' } },
-      el('button.btn.big.primary', { onclick: () => { SFX.click(); showScreen('lobby', s.mode === 'weekly' ? { weekly: true } : undefined); } }, '⚡ RACE AGAIN'),
+      online && NET.status !== 'idle'
+        ? el('button.btn.big.primary', { onclick: () => { SFX.click(); showScreen('room'); } }, '🏁 BACK TO ROOM')
+        : el('button.btn.big.primary', { onclick: () => { SFX.click(); showScreen('lobby', s.mode === 'weekly' ? { weekly: true } : undefined); } }, '⚡ RACE AGAIN'),
       el('button.btn.big', { onclick: () => { SFX.click(); showScreen('leaderboards'); } }, 'STANDINGS'),
       el('button.btn.big.ghosted', { onclick: () => { SFX.click(); showScreen('home'); } }, 'HOME')));
 };

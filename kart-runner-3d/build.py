@@ -22,6 +22,9 @@ html = f"""<!DOCTYPE html>
 {rd("lib/three.iife.js")}
 </script>
 <script>
+{rd("lib/peerjs.iife.js")}
+</script>
+<script>
 {js}
 </script>
 </body>

@@ -38,9 +38,10 @@ function startRace(cfg) {
   const p = DB.profile;
   const mods = skillMods(p.skills);
   const training = Race.mode === 'training';
+  const online = Race.mode === 'online';
 
   const player = new Kart({
-    isPlayer: true, id: 'me', name: p.name || 'RACER', color: p.color, number: p.number,
+    isPlayer: true, id: online ? NET.myId : 'me', name: p.name || 'RACER', color: p.color, number: p.number,
     flag: p.flag, elo: p.elo, clanTag: clanTagOf(p), mods, track,
     compound: cfg.compound, assists: { ...DB.settings.assists },
   });
@@ -48,7 +49,14 @@ function startRace(cfg) {
   Race.player = player;
   Race.karts.push(player);
 
-  if (!training) {
+  if (online) {
+    for (const pr of (cfg.roster || NET.playerList)) {
+      if (pr.id === NET.myId) continue;
+      Race.karts.push(new RemoteKart(pr, track));
+    }
+    Race.goTime = 4.0;   // fixed, so every browser launches together
+    wireNetForRace();
+  } else if (!training) {
     const lobby = cfg.lobby || pickLobby();
     lobby.forEach((rv, i) => {
       const kart = new Kart({
@@ -62,10 +70,16 @@ function startRace(cfg) {
     });
   }
 
-  // grid order: reverse championship-ish — random but player mid-pack
+  // grid order: online = host's published order; offline = shuffled
   const slots = track.gridSlots;
-  const order = [...Race.karts];
-  for (let i = order.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0;[order[i], order[j]] = [order[j], order[i]]; }
+  let order;
+  if (online && cfg.grid) {
+    order = cfg.grid.map(id => Race.karts.find(k => k.id === id)).filter(Boolean);
+    for (const k of Race.karts) if (!order.includes(k)) order.push(k);
+  } else {
+    order = [...Race.karts];
+    for (let i = order.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0;[order[i], order[j]] = [order[j], order[i]]; }
+  }
   order.forEach((k, i) => { k.placeAt(slots[training ? 0 : i]); k.pos = i + 1; });
 
   // ghost
@@ -88,6 +102,22 @@ function startRace(cfg) {
   SFX.startEngine();
   cancelAnimationFrame(Race.rafId);
   Race.rafId = requestAnimationFrame(raceLoop);
+
+  // online: if the tab is backgrounded, rAF stops — keep the sim and the
+  // pose stream alive on a timer so the room doesn't see us freeze
+  clearInterval(Race.bgTick);
+  if (online) {
+    Race.bgTick = setInterval(() => {
+      if (!Race.active) return;
+      const now = performance.now();
+      if (now - Race.lastTs < 350) return;    // rAF is healthy
+      Race.acc += (now - Race.lastTs) / 1000;
+      Race.lastTs = now;
+      Race.acc = Math.min(Race.acc, 1.2);
+      let steps = 0;
+      while (Race.acc >= DT && steps < 150) { stepSim(); Race.acc -= DT; steps++; }
+    }, 250);
+  }
 }
 
 /* world event hooks (physics → juice) */
@@ -109,6 +139,10 @@ const WORLD = {
         toast(fmtTime(lt) + (pb ? ' · PERSONAL BEST!' : ''), pb ? 'good' : '');
         if (kart.lap === total) centerMsg('FINAL LAP', 'med');
         SFX.lap();
+      }
+      // friends room: tell the others
+      if (Race.mode === 'online' && kart.lap <= total + 1) {
+        NET.sendLap(Math.round(lt * 1000), Math.round((kart.bestLap || lt) * 1000));
       }
       // training ghost: keep best lap
       if (Race.mode === 'training') {
@@ -132,7 +166,7 @@ function raceLoop(ts) {
   if (!Race.lastTs) Race.lastTs = ts;
   let frame = (ts - Race.lastTs) / 1000;
   Race.lastTs = ts;
-  if (Race.paused) return;
+  if (Race.paused && Race.mode !== 'online') return;  // online races never freeze
   frame = Math.min(frame, 0.1);
   Race.acc += frame;
   let steps = 0;
@@ -196,21 +230,38 @@ function stepSim() {
     p.inSteer = clamp(angWrap(Math.atan2(L.y - p.y, L.x - p.x) - p.heading) * 2, -1, 1);
   }
 
+  const online = R.mode === 'online';
   if (racing) {
     for (const k of R.karts) {
+      if (k.isRemote) {
+        k.update();
+        if (!k.finished && k.lap > R.cfg.laps && !R.player.finished) toastOnce(k.name + ' finished', '', 'fin-' + k.id);
+        continue;
+      }
       k.step(R.raceT, WORLD);
       updatePitState(k, WORLD);
       // finish detection
       if (!k.finished && k.lap > R.cfg.laps) {
         k.finished = true; k.finishT = R.raceT;
-        if (k.isPlayer) onPlayerFinish();
-        else if (!R.player.finished) toastOnce(k.name + ' finished', '', 'fin-' + k.id);
+        if (k.isPlayer) {
+          if (online) NET.sendFinish(Math.round(R.raceT * 1000));
+          onPlayerFinish();
+        } else if (!R.player.finished) toastOnce(k.name + ' finished', '', 'fin-' + k.id);
       }
     }
-    collideKarts(R.karts, WORLD);
+    if (online) {
+      collideLocalRemote(p);
+      sendPoseThrottled(p, 60);
+    } else {
+      collideKarts(R.karts, WORLD);
+    }
     updateSlipstream(R.karts);
   } else {
-    for (const k of R.karts) { k.vx = k.vy = 0; }
+    for (const k of R.karts) if (!k.isRemote) { k.vx = k.vy = 0; }
+    if (online) {
+      sendPoseThrottled(p, 140);
+      for (const k of R.karts) if (k.isRemote) k.update();
+    }
   }
 
   // positions
@@ -296,6 +347,61 @@ function onPlayerFinish() {
     });
   }
   Race.finishTimer = 2.6;
+}
+
+/* ---------------- online glue ---------------- */
+// wall-clock gated so background catch-up bursts don't flood the wire
+function sendPoseThrottled(p, minGapMs) {
+  const now = performance.now();
+  if (now - (Race._lastPoseAt || 0) < minGapMs) return;
+  Race._lastPoseAt = now;
+  NET.sendPose(packPose(p));
+}
+
+function wireNetForRace() {
+  const find = id => Race.karts.find(k => k.id === id);
+  NET.handlers.onPose = (id, d) => { const k = find(id); if (k && k.isRemote) k.pushPose(d); };
+  NET.handlers.onLap = (id, ms, bestMs) => {
+    const k = find(id);
+    if (k && k.isRemote) {
+      k.lastLap = ms / 1000;
+      k.lapTimes.push(ms / 1000);
+      const b = bestMs / 1000;
+      if (k.bestLap == null || b < k.bestLap) k.bestLap = b;
+    }
+  };
+  NET.handlers.onFinish = (id, ms) => {
+    const k = find(id);
+    if (k && k.isRemote && !k.finished) { k.finished = true; k.finishT = ms / 1000; }
+  };
+  NET.handlers.onRoster = () => {
+    for (const k of Race.karts) if (k.isRemote && !NET.players.has(k.id) && !k.gone) {
+      k.gone = true;
+      toast(k.name + ' disconnected', 'warn');
+    }
+  };
+  NET.handlers.onClosed = msg => { if (Race.active) toast(msg, 'warn'); };
+  NET.handlers.onStart = null;
+  NET.handlers.onError = null;
+}
+
+// local kart vs remote poses: push only ourselves (their sim owns their kart)
+function collideLocalRemote(p) {
+  if (p.finished) return;
+  for (const o of Race.karts) {
+    if (!o.isRemote || o.gone) continue;
+    const dx = p.x - o.x, dy = p.y - o.y;
+    const d2 = dx * dx + dy * dy, min = KART_R * 2;
+    if (d2 > min * min || d2 === 0) continue;
+    const d = Math.sqrt(d2), nx = dx / d, ny = dy / d;
+    p.x += nx * (min - d); p.y += ny * (min - d);
+    const vn = p.vx * nx + p.vy * ny;
+    if (vn < 0) {
+      p.vx -= nx * vn * 1.3; p.vy -= ny * vn * 1.3;
+      p.vx *= 0.85; p.vy *= 0.85;
+      if (Math.abs(vn) > 3.5) WORLD.onBump(Math.abs(vn));
+    }
+  }
 }
 
 /* particles */
@@ -451,7 +557,7 @@ function updateHUDText(force) {
     H.tower.append(el('div.trow' + (k.isPlayer ? '.me' : ''), {},
       el('span.p', {}, 'P' + k.pos),
       el('span.dot', { style: { background: k.color } }),
-      el('span.n', {}, (k.clanTag ? '[' + k.clanTag + '] ' : '') + k.name + (k.pitState ? ' 🔧' : '')),
+      el('span.n', {}, (k.clanTag ? '[' + k.clanTag + '] ' : '') + k.name + (k.pitState ? ' 🔧' : '') + (k.gone ? ' ⛔' : '')),
       el('span.gap', {}, k.finished && k.pos === 1 ? '🏁' : gap),
     ));
     prev = k;
@@ -496,9 +602,11 @@ function togglePause(force) {
     }, el('i'));
     return el('div.assist-row', {}, el('div.grow', {}, el('div.aname', {}, label), el('div.adesc', {}, desc)), t);
   };
+  const online = Race.mode === 'online';
   ov = el('div', { id: 'pause-overlay' },
     el('div.modal', {},
-      el('h2', {}, 'PAUSED'),
+      el('h2', {}, online ? 'RACE MENU' : 'PAUSED'),
+      online ? el('p', { style: { margin: '0 0 4px', fontSize: '12.5px', color: 'var(--ink-3)' } }, 'Online race — the clock keeps running!') : null,
       el('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' } },
         assistToggle('line', 'Racing line', 'Colour-coded ideal line'),
         assistToggle('markers', 'Brake markers', 'Boards before big stops'),
@@ -506,11 +614,13 @@ function togglePause(force) {
         assistToggle('autobrake', 'Auto-brake', 'Brakes for the corner — training wheels'),
       ),
       el('div.btnrow', {},
-        el('button.btn.primary', { onclick: () => togglePause(false) }, 'RESUME'),
-        el('button.btn', { onclick: () => { quitRace(); startRace(Race.cfg); } }, 'RESTART'),
+        el('button.btn.primary', { onclick: () => togglePause(false) }, online ? 'BACK TO RACE' : 'RESUME'),
+        online ? null : el('button.btn', { onclick: () => { quitRace(); startRace(Race.cfg); } }, 'RESTART'),
         Race.mode === 'training'
           ? el('button.btn.grass', { onclick: () => { Race.paused = false; endRace(); } }, 'END SESSION')
-          : el('button.btn.ghosted', { onclick: () => { quitRace(); showScreen('home'); } }, 'QUIT'),
+          : online
+            ? el('button.btn.ghosted', { onclick: () => { quitRace(); showScreen('room'); } }, 'LEAVE RACE')
+            : el('button.btn.ghosted', { onclick: () => { quitRace(); showScreen('home'); } }, 'QUIT'),
       ),
     ));
   document.getElementById('hud').append(ov);
@@ -520,6 +630,7 @@ function togglePause(force) {
 function quitRace() {
   Race.active = false;
   cancelAnimationFrame(Race.rafId);
+  clearInterval(Race.bgTick);
   SFX.stopEngine();
   const ov = document.getElementById('pause-overlay');
   ov && ov.remove();
@@ -547,16 +658,23 @@ function endRace() {
 
   if (R.mode !== 'training') {
     const pr = DB.profile;
-    const aiField = ranked.filter(k => !k.isPlayer).map(k => ({ elo: k.elo, pos: k.pos }));
-    const dElo = eloDelta(pr.elo, aiField, p.pos);
-    pr.elo = Math.max(600, pr.elo + dElo);
-    summary.eloAfter = pr.elo;
+    let pts = 0, dElo = 0;
 
-    const pts = RACE_PTS[p.pos - 1] || 0;
-    summary.pts = pts;
-    pr.seasonPts += pts;
+    if (R.mode === 'online') {
+      // friendly room: bragging rights, no ELO or season points
+      NET.raceOver();
+    } else {
+      const aiField = ranked.filter(k => !k.isPlayer).map(k => ({ elo: k.elo, pos: k.pos }));
+      dElo = eloDelta(pr.elo, aiField, p.pos);
+      pr.elo = Math.max(600, pr.elo + dElo);
+      summary.eloAfter = pr.elo;
 
-    settleLadder(ranked.filter(k => !k.isPlayer).map(k => k.id), order);
+      pts = RACE_PTS[p.pos - 1] || 0;
+      summary.pts = pts;
+      pr.seasonPts += pts;
+
+      settleLadder(ranked.filter(k => !k.isPlayer).map(k => k.id), order);
+    }
 
     pr.stats.races++;
     if (p.pos === 1) pr.stats.wins++;
