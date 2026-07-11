@@ -58,7 +58,7 @@ WebRTC (no TURN relay is configured); if the host closes the tab, the room ends.
 | File | What it does |
 |---|---|
 | `src/00-core.js` | utilities, save/load, profile, ELO math, tiers, rivals ladder, weekly challenge |
-| `src/10-track.js` | 5 circuits as control points → Catmull-Rom spline sampling, racing-line optimisation (taut-string), corner speed profile, decor generation, surface queries |
+| `src/10-track.js` | 10 circuits as control points → Catmull-Rom spline sampling, racing-line optimisation (taut-string), corner speed profile, decor generation, surface queries |
 | `src/30-physics.js` | the kart model: grip-budget tyre physics, drift/boost, wear, walls, laps/checkpoints; kart-kart collisions; slipstream |
 | `src/35-ai.js` | AI drivers (same physics as the player): line following, braking profile, traffic avoidance, mistakes, pit strategy; shared pit-stop state machine |
 | `src/40-render.js` | Three.js renderer: track mesh, kerbs, gantry, instanced decor, toon karts, chase camera, skid marks, particles, snow, name sprites; plus the 2D minimap painter |

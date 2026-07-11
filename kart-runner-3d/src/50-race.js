@@ -273,11 +273,15 @@ function stepSim() {
   });
   ranked.forEach((k, i) => k.pos = i + 1);
 
-  // overtake feedback
-  if (racing && !p.finished) {
-    if (p.pos < R.lastPosSeen) { toast('P' + p.pos + ' ▲', 'good'); SFX.blip(1); }
-    else if (p.pos > R.lastPosSeen) { SFX.blip(0); }
-    R.lastPosSeen = p.pos;
+  // overtake feedback (cooldown so pack shuffles don't spam toasts)
+  if (racing && !p.finished && p.pos !== R.lastPosSeen) {
+    const now = performance.now();
+    if (now - (R._posToastAt || 0) > 1500) {
+      R._posToastAt = now;
+      if (p.pos < R.lastPosSeen) { toast('P' + p.pos + ' ▲', 'good'); SFX.blip(1); }
+      else SFX.blip(0);
+      R.lastPosSeen = p.pos;
+    }
   }
 
   // ghost record/playback (training)
@@ -288,8 +292,8 @@ function stepSim() {
   // particles from karts
   for (const k of R.karts) {
     if (k.sliding > 0.35 && k.speed > 8 && Math.random() < 0.45) {
-      const offC = R.track.theme === 'snow' ? '#F4F8FF' : '#5DD17B';
-      spawnSmoke(k.x - Math.cos(k.heading) * 0.9, k.y - Math.sin(k.heading) * 0.9, k.surf === 'grass' ? offC : '#F0EEF5');
+      // off-track dust matches the world: sand, ash, snow, grass…
+      spawnSmoke(k.x - Math.cos(k.heading) * 0.9, k.y - Math.sin(k.heading) * 0.9, k.surf === 'grass' ? R.track.colors.ground2 : '#F0EEF5');
       Race.renderer.skidMark(k);
     } else if ((k.driftActive || k.boostT > 0) && Math.random() < 0.5) {
       Race.renderer.skidMark(k);
@@ -297,7 +301,7 @@ function stepSim() {
       Race.renderer.skidBreak(k);
     }
     if (k.surf === 'grass' && k.speed > 6 && Math.random() < 0.3) {
-      spawnGrass(k.x, k.y, R.track.theme === 'snow' ? '#FFFFFF' : '#36A857');
+      spawnGrass(k.x, k.y, R.track.theme === 'meadow' || R.track.theme === 'forest' ? '#36A857' : R.track.colors.ground2);
     }
   }
   // particle physics

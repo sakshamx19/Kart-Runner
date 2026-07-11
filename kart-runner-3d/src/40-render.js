@@ -14,6 +14,9 @@ const SKY_THEMES = {
   forest: { top: 0x2b8fd0, horizon: 0xcdeed2, fogNear: 85, fogFar: 250 },
   coast:  { top: 0x2fa6e8, horizon: 0xffedbe, fogNear: 90, fogFar: 260 },
   snow:   { top: 0x4b3fd0, horizon: 0x9c8bf0, fogNear: 70, fogFar: 230 },
+  desert: { top: 0x7b5fe0, horizon: 0xffb37a, fogNear: 90, fogFar: 260, sun: 0xffa04d },
+  volcano:{ top: 0x241f30, horizon: 0xff7a5a, fogNear: 60, fogFar: 210, sun: 0xff6b35, cloud: 0x554e66, hemi: 0.75, dir: 1.2, dirColor: 0xffb59a },
+  night:  { top: 0x11102b, horizon: 0x4a3f8f, fogNear: 65, fogFar: 210, sun: 0xf4f1e0, cloud: 0x8a84b8, hemi: 0.65, dir: 1.0, dirColor: 0xbfd0ff },
 };
 
 /* ---------- texture helpers (all generated, nothing external) ---------- */
@@ -51,8 +54,22 @@ function groundTexture(theme, c1, c2) {
     if (theme === 'snow') {
       for (let i = 0; i < 120; i++) { c.globalAlpha = 0.5; c.beginPath(); c.arc(Math.random() * w, Math.random() * h, 1.6, 0, 7); c.fill(); }
       c.globalAlpha = 1;
-    } else if (theme === 'coast') {
+    } else if (theme === 'coast' || theme === 'desert') {
       for (let i = 0; i < 200; i++) { c.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+    } else if (theme === 'volcano') {
+      // cooled-lava cracks
+      c.strokeStyle = c2; c.lineWidth = 2;
+      for (let i = 0; i < 26; i++) {
+        c.beginPath();
+        let x = Math.random() * w, y = Math.random() * h;
+        c.moveTo(x, y);
+        for (let s2 = 0; s2 < 4; s2++) { x += (Math.random() - 0.5) * 40; y += (Math.random() - 0.5) * 40; c.lineTo(x, y); }
+        c.stroke();
+      }
+    } else if (theme === 'night') {
+      c.globalAlpha = 0.6;
+      for (let i = 0; i < 6; i++) { c.fillRect(0, i * 42, w, 2); c.fillRect(i * 42, 0, 2, h); }
+      c.globalAlpha = 1;
     } else {
       c.fillRect(0, 0, w / 2, h); // mown stripes
     }
@@ -271,11 +288,24 @@ class Renderer {
     this.scene.add(this.sky);
     this.scene.fog = new THREE.Fog(sk.horizon, sk.fogNear, sk.fogFar);
 
-    // cartoon sun + a few puffy clouds
-    const sun = new THREE.Mesh(new THREE.SphereGeometry(26, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffd23f, fog: false }));
+    // cartoon sun (or moon, or volcano glow) + a few puffy clouds
+    const sun = new THREE.Mesh(new THREE.SphereGeometry(26, 16, 12), new THREE.MeshBasicMaterial({ color: sk.sun || 0xffd23f, fog: false }));
     sun.position.set(220, 240, -260);
     this.scene.add(sun);
-    const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false, transparent: true, opacity: 0.9 });
+    if (this.track.theme === 'night') {
+      const starPos = new Float32Array(300 * 3);
+      for (let i = 0; i < 300; i++) {
+        const a = Math.random() * TAU, e = 0.15 + Math.random() * 1.2;
+        starPos[i * 3] = Math.cos(a) * Math.cos(e) * 560;
+        starPos[i * 3 + 1] = Math.sin(e) * 560;
+        starPos[i * 3 + 2] = Math.sin(a) * Math.cos(e) * 560;
+      }
+      const sg = new THREE.BufferGeometry();
+      sg.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+      this.stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xfff6d8, size: 2.2, fog: false, sizeAttenuation: false }));
+      this.scene.add(this.stars);
+    }
+    const cloudMat = new THREE.MeshBasicMaterial({ color: sk.cloud || 0xffffff, fog: false, transparent: true, opacity: 0.9 });
     for (let i = 0; i < 7; i++) {
       const cl = new THREE.Group();
       for (let b = 0; b < 3; b++) {
@@ -291,9 +321,10 @@ class Renderer {
   }
 
   buildLights() {
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x99b077, 0.95);
+    const sk = SKY_THEMES[this.track.theme] || SKY_THEMES.meadow;
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x99b077, sk.hemi != null ? sk.hemi : 0.95);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xfff2d8, 1.6);
+    const sun = new THREE.DirectionalLight(sk.dirColor || 0xfff2d8, sk.dir != null ? sk.dir : 1.6);
     sun.position.set(60, 90, 30);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -517,6 +548,7 @@ class Renderer {
 
     this.buildDecorMeshes();
     if (tr.theme === 'snow') this.buildSnow();
+    if (tr.theme === 'volcano') this.buildSnow(0x9a92a8, 0.26, 0.018);   // drifting ash
   }
 
   buildDecorMeshes() {
@@ -571,14 +603,29 @@ class Renderer {
       flowers.forEach((d, i) => { setM(bloom, i, d.x, 0.28, d.y); bloom.setColorAt(i, new THREE.Color(d.c)); });
       this.scene.add(bloom);
     }
-    // rocks / snowmen
+    // rocks / snow drifts / sandstone / cooled lava boulders
     const rocks = byType.rock || [];
     if (rocks.length) {
-      const snow = tr.theme === 'snow';
-      const rock = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1), new THREE.MeshToonMaterial({ color: snow ? 0xffffff : 0xb7bcc7 }), rocks.length);
+      const rockColor = { snow: 0xffffff, desert: 0xd9a066, volcano: 0x38314a }[tr.theme] || 0xb7bcc7;
+      const rock = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1), new THREE.MeshToonMaterial({ color: rockColor }), rocks.length);
       rocks.forEach((d, i) => setM(rock, i, d.x, d.r * 0.5, d.y, d.x, d.r, d.r * 0.7, d.r));
       rock.castShadow = true;
       this.scene.add(rock);
+    }
+    // cacti — saguaro silhouettes: tall trunk + two side arms
+    const cacti = byType.cactus || [];
+    if (cacti.length) {
+      const cMat = new THREE.MeshToonMaterial({ color: 0x2f9a4e });
+      const trunk = new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.42, 2.4, 4, 8), cMat, cacti.length);
+      const arm = new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.26, 1.0, 4, 8), cMat, cacti.length * 2);
+      cacti.forEach((d, i) => {
+        const s = d.r / 1.6;
+        setM(trunk, i, d.x, 1.7 * s, d.y, 0, s, s, s);
+        setM(arm, i * 2, d.x + 0.72 * s, 1.5 * s, d.y, 0, s, s, s);
+        setM(arm, i * 2 + 1, d.x - 0.72 * s, 1.1 * s, d.y + 0.1, 0, s, s, s);
+      });
+      trunk.castShadow = true;
+      this.scene.add(trunk, arm);
     }
     // umbrellas
     const umb = byType.umbrella || [];
@@ -602,7 +649,19 @@ class Renderer {
         c.fillStyle = '#FFFDF7';
         for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) c.fillRect(8 + i * 18, 8 + j * 18, 10, 12);
       });
-      const bld = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ map: winTex }), builds.length);
+      const bldMat = new THREE.MeshLambertMaterial({ map: winTex });
+      if (tr.theme === 'night') {
+        // windows glow warm against the dark facades
+        bldMat.emissive = new THREE.Color(0xffe9a8);
+        bldMat.emissiveIntensity = 0.85;
+        bldMat.emissiveMap = canvasTex(64, 64, (c, w, h) => {
+          c.fillStyle = '#000000'; c.fillRect(0, 0, w, h);
+          for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+            if (Math.random() < 0.75) { c.fillStyle = '#ffffff'; c.fillRect(8 + i * 18, 8 + j * 18, 10, 12); }
+          }
+        });
+      }
+      const bld = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), bldMat, builds.length);
       builds.forEach((d, i) => {
         const hgt = 6 + (d.w + d.h) * 0.45;
         setM(bld, i, d.x, hgt / 2, d.y, -d.rot, d.w, hgt, d.h);
@@ -653,16 +712,20 @@ class Renderer {
       g.rotation.y = -d.rot;
       this.scene.add(g);
     }
-    // water
+    // water — or lava, on the volcano
     this.waterMeshes = [];
+    const lava = this.track.theme === 'volcano';
     for (const d of (byType.water || [])) {
+      const discColor = lava ? 0xff5a2e : this.track.theme === 'snow' ? 0xbfe4ff : 0x4abeff;
       const disc = new THREE.Mesh(new THREE.CircleGeometry(d.r, 26),
-        new THREE.MeshLambertMaterial({ color: this.track.theme === 'snow' ? 0xbfe4ff : 0x4abeff, transparent: true, opacity: 0.92 }));
+        lava
+          ? new THREE.MeshBasicMaterial({ color: discColor })     // lava glows, ignores lighting
+          : new THREE.MeshLambertMaterial({ color: discColor, transparent: true, opacity: 0.92 }));
       disc.rotation.x = -Math.PI / 2;
       disc.position.set(d.x, 0.005, d.y);
       this.scene.add(disc);
       const ring = new THREE.Mesh(new THREE.RingGeometry(d.r * 0.5, d.r * 0.53, 30),
-        new THREE.MeshBasicMaterial({ color: 0xeaf7ff, transparent: true, opacity: 0.7, side: THREE.DoubleSide }));
+        new THREE.MeshBasicMaterial({ color: lava ? 0xffd23f : 0xeaf7ff, transparent: true, opacity: 0.7, side: THREE.DoubleSide }));
       ring.rotation.x = -Math.PI / 2;
       ring.position.set(d.x, 0.02, d.y);
       this.scene.add(ring);
@@ -670,7 +733,7 @@ class Renderer {
     }
   }
 
-  buildSnow() {
+  buildSnow(color = 0xffffff, size = 0.35, fall = 0.045) {
     const N = 600;
     const posArr = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) {
@@ -680,7 +743,8 @@ class Renderer {
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
-    this.snowPts = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.35, transparent: true, opacity: 0.9 }));
+    this.snowFall = fall;
+    this.snowPts = new THREE.Points(geo, new THREE.PointsMaterial({ color, size, transparent: true, opacity: 0.9 }));
     this.scene.add(this.snowPts);
   }
 
@@ -844,7 +908,7 @@ class Renderer {
     if (this.snowPts) {
       const a = this.snowPts.geometry.attributes.position;
       for (let i = 0; i < a.count; i++) {
-        let y = a.getY(i) - 0.045;
+        let y = a.getY(i) - (this.snowFall || 0.045);
         if (y < 0) y = 38;
         a.setY(i, y);
       }
@@ -866,6 +930,7 @@ class Renderer {
     this.sun.position.set(cam.x + 60, 90, cam.y + 30);
     this.sun.target.position.set(cam.x, 0, cam.y);
     this.sky.position.set(cam.x, 0, cam.y);
+    if (this.stars) this.stars.position.set(cam.x, 0, cam.y);
 
     this.three.render(this.scene, this.camera);
   }
