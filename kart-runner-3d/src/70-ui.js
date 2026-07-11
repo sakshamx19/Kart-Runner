@@ -440,7 +440,7 @@ SCREENS.tracks = () => {
         el('div', { style: { fontSize: '12.5px', color: 'var(--ink-3)' } }, tr.def.desc))));
   }
   return el('div.screen', {},
-    pageHead('PICK YOUR CIRCUIT', 'Four worlds, four rhythms. The racing line is always watching.', 'CIRCUIT'),
+    pageHead('PICK YOUR CIRCUIT', 'Ten circuits, ten rhythms — meadow to volcano to midnight city. The racing line is always watching.', 'CIRCUIT'),
     grid,
     el('div', {},
       el('button.btn.big.primary', { onclick: () => { SFX.click(); showScreen('lobby'); } }, '⚡ RACE ' + TRACKS[DB.settings.trackId].name.toUpperCase())));

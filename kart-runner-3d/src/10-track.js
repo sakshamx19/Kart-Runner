@@ -63,6 +63,64 @@ const TRACK_DEFS = {
     ],
     pitSide: 1,
   },
+  royal: {
+    name: 'Royal Ring', type: 'Speedbowl', flag: '👑', theme: 'meadow',
+    width: 10, runoff: 11,
+    desc: 'Flat-out, foot-down, heart-out. Two chicanes ruin everything.',
+    pts: [
+      [0, 0], [120, 0], [240, 0], [296, 18], [318, 66], [300, 118], [246, 152],
+      [150, 158], [112, 190], [56, 200], [20, 164], [-38, 168], [-76, 198],
+      [-118, 182], [-136, 124], [-116, 62], [-84, 28], [-40, 4],
+    ],
+    pitSide: -1,
+  },
+  dune: {
+    name: 'Dune Dash', type: 'Desert GP', flag: '🌵', theme: 'desert',
+    width: 10.5, runoff: 9,
+    desc: 'Golden sweepers at sunset. The sand does not forgive lazy hands.',
+    pts: [
+      [0, 0], [110, -8], [200, 10], [250, 60], [230, 110], [170, 122], [128, 92],
+      [80, 82], [40, 112], [50, 162], [100, 192], [90, 242], [30, 260],
+      [-40, 242], [-70, 192], [-50, 142], [-90, 112], [-100, 60], [-60, 16],
+    ],
+    pitSide: 1,
+  },
+  volcano: {
+    name: 'Mount Vroom', type: 'Volcano', flag: '🌋', theme: 'volcano',
+    width: 9.5, runoff: 6,
+    desc: 'Hairpins on a live volcano. The lava is decorative. Probably.',
+    pts: [
+      [0, 0], [90, -4], [150, 10], [180, 50], [150, 86], [102, 80], [72, 112],
+      [102, 150], [150, 152], [180, 192], [150, 228], [90, 232], [40, 202],
+      [-10, 222], [-62, 232], [-92, 196], [-80, 150], [-40, 130], [-32, 90],
+      [-72, 60], [-60, 20],
+    ],
+    pitSide: -1,
+  },
+  neon: {
+    name: 'Neon Harbor', type: 'Night Street', flag: '🌃', theme: 'night',
+    width: 9, runoff: 2.6,
+    desc: 'Midnight, wet-look asphalt and a skyline that never sleeps.',
+    pts: [
+      [0, 0], [90, 0], [170, 0], [186, 28], [186, 90], [160, 112], [110, 114],
+      [92, 142], [96, 190], [130, 208], [176, 214], [190, 242], [168, 264],
+      [100, 268], [40, 260], [10, 232], [-40, 238], [-80, 216], [-88, 170],
+      [-60, 148], [-70, 110], [-96, 84], [-88, 38], [-50, 10],
+    ],
+    pitSide: 1,
+  },
+  serpent: {
+    name: 'Serpent Pass', type: 'Forest GP', flag: '🐍', theme: 'forest',
+    width: 9.5, runoff: 8,
+    desc: 'A ribbon of esses through old pines. Rhythm is everything.',
+    pts: [
+      [0, 0], [100, 6], [170, -10], [230, 20], [240, 70], [200, 102], [150, 92],
+      [112, 122], [132, 165], [180, 182], [190, 226], [140, 250], [80, 236],
+      [40, 262], [-20, 268], [-70, 240], [-80, 190], [-45, 166], [-55, 126],
+      [-95, 106], [-105, 55], [-65, 15],
+    ],
+    pitSide: -1,
+  },
 };
 
 const THEME_COLORS = {
@@ -71,6 +129,9 @@ const THEME_COLORS = {
   forest: { ground: '#6FBF82', ground2: '#63B476', road: '#565270', kerb1: '#F2B900', kerb2: '#FFFDF7', edge: '#0F0E17', accent: '#5DD17B' },
   coast:  { ground: '#F4DFA5', ground2: '#EED493', road: '#5E5A78', kerb1: '#4ABEFF', kerb2: '#FFFDF7', edge: '#0F0E17', accent: '#4ABEFF' },
   snow:   { ground: '#EFEAF9', ground2: '#E3DBF4', road: '#6B6787', kerb1: '#FF4D2E', kerb2: '#FFFDF7', edge: '#0F0E17', accent: '#4ABEFF' },
+  desert: { ground: '#F2C179', ground2: '#E9B366', road: '#6E5F70', kerb1: '#FF4D2E', kerb2: '#FFFDF7', edge: '#0F0E17', accent: '#F2B900' },
+  volcano:{ ground: '#4A4054', ground2: '#413848', road: '#2E2838', kerb1: '#FFD23F', kerb2: '#FFFDF7', edge: '#0F0E17', accent: '#FF4D2E' },
+  night:  { ground: '#3A3650', ground2: '#332F48', road: '#232030', kerb1: '#FF7AB6', kerb2: '#FFFDF7', edge: '#0F0E17', accent: '#FF7AB6' },
 };
 
 /* Catmull-Rom on closed loop */
@@ -323,8 +384,10 @@ function buildDecor(id, def, samples, n, minDistToCenter, bbox) {
       }
     }, 26);
   }
-  if (theme === 'street') {
+  if (theme === 'street' || theme === 'night') {
     // buildings hug the outside of the ribbon
+    const NIGHT_BUILDS = ['#5F4BC9', '#3E77D8', '#B84BB0', '#3FA9A2', '#7A5FE0', '#D8557E'];
+    const palette = theme === 'night' ? NIGHT_BUILDS : BUILDS;
     for (let i = 0; i < n; i += Math.round(16 / (samples[1].s - samples[0].s || 2.6))) {
       const sm = samples[i];
       for (const side of [-1, 1]) {
@@ -336,16 +399,39 @@ function buildDecor(id, def, samples, n, minDistToCenter, bbox) {
         if (minDistToCenter(bx, by) < def.width + def.runoff + halfDiag + 1) continue;
         decor.push({
           t: 'building', x: bx, y: by, rot: Math.atan2(sm.ty, sm.tx),
-          w: bw, h: bh, c: BUILDS[(r() * BUILDS.length) | 0],
+          w: bw, h: bh, c: palette[(r() * palette.length) | 0],
           floors: 2 + (r() * 3 | 0),
         });
       }
     }
     tryPlace((x, y, d) => {
-      if (d > def.width + def.runoff + 2.5 && d < def.width + 26 && r() < 0.35) {
+      if (theme === 'street' && d > def.width + def.runoff + 2.5 && d < def.width + 26 && r() < 0.35) {
         decor.push({ t: 'tree', x, y, r: 2 + r() * 1.6, c: GREENS[(r() * GREENS.length) | 0] });
       }
-    }, 40);
+    }, theme === 'street' ? 40 : 0);
+  }
+  if (theme === 'desert') {
+    tryPlace((x, y, d) => {
+      if (d > def.width + def.runoff + 3.5 && d < def.width + 60) {
+        if (r() < 0.55) decor.push({ t: 'cactus', x, y, r: 1.5 + r() * 1.4 });
+        else if (r() < 0.6) decor.push({ t: 'rock', x, y, r: 1.4 + r() * 2.4 });
+      }
+    }, 240);
+  }
+  if (theme === 'volcano') {
+    tryPlace((x, y, d) => {
+      if (d > def.width + def.runoff + 3 && d < def.width + 55 && r() < 0.75) {
+        decor.push({ t: 'rock', x, y, r: 1.6 + r() * 3 });
+      }
+    }, 200);
+    // lava pools glowing in the dark — placed clear of the racing surface
+    let pools = 0;
+    tryPlace((x, y, d) => {
+      if (pools < 3 && d > def.width + def.runoff + 24) {
+        decor.push({ t: 'water', x, y, r: 16 + r() * 14 });
+        pools++;
+      }
+    }, 80);
   }
   if (theme === 'coast') {
     tryPlace((x, y, d) => {
