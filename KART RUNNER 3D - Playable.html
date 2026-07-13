@@ -8192,6 +8192,40 @@ function showOnboarding() {
    Nothing runs on a server — hosting is static.
    ============================================================ */
 
+/* ------------------------------------------------------------------
+   ICE / relay configuration — what lets rooms connect across networks.
+
+   • STUN finds a DIRECT browser-to-browser path. Works on home Wi-Fi,
+     mobile data, most cafés. Free, no relay cost.
+   • TURN *relays* the traffic through a public server when a firewall
+     blocks the direct path. This is the ONLY thing that gets rooms
+     working on strict office / corporate networks (like polestarllp).
+
+   The free OpenRelay entries below get you connected out-of-the-box on
+   most networks. For GUARANTEED corporate-firewall traversal, grab a
+   free TURN plan (metered.ca — free tier, no card) and paste the three
+   credentials it gives you into MY_TURN below. Nothing else to change.
+   ------------------------------------------------------------------ */
+
+//  ↓↓↓  PASTE YOUR OWN TURN CREDENTIALS HERE for rock-solid office hosting  ↓↓↓
+//  (uncomment the three lines and fill in username/credential from your provider)
+const MY_TURN = [
+  // { urls: 'turn:global.relay.metered.ca:80',                username: 'YOUR_USERNAME', credential: 'YOUR_PASSWORD' },
+  // { urls: 'turn:global.relay.metered.ca:443',               username: 'YOUR_USERNAME', credential: 'YOUR_PASSWORD' },
+  // { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: 'YOUR_USERNAME', credential: 'YOUR_PASSWORD' },
+];
+
+const ICE_SERVERS = [
+  // STUN — direct path (free, tried first)
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  // Free public TURN fallback — test-grade: reliable on home/café, may be
+  // flaky on locked-down networks. Real creds in MY_TURN override this.
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+  ...MY_TURN,
+];
+
 const NET = {
   peer: null,
   isHost: false,
@@ -8218,8 +8252,9 @@ const NET = {
 
   /* ---------------- room lifecycle ---------------- */
   _newPeer(id) {
-    // default PeerJS cloud broker + Google STUN — fine for friends rooms
-    return new Peer(id, { debug: 1 });
+    // default PeerJS cloud broker for signaling; ICE_SERVERS (STUN + TURN
+    // relay) for NAT traversal so rooms connect across strict networks too
+    return new Peer(id, { debug: 1, config: { iceServers: ICE_SERVERS } });
   },
 
   createRoom(done) {
