@@ -97,7 +97,7 @@ function startRace(cfg) {
 
   buildHUD();
   Race.active = true; Race.paused = false;
-  if (touchApplyInput) touchApplyInput();   // auto-gas: on throttle from the lights
+  if (typeof touchApplyInput === 'function') touchApplyInput();   // auto-gas: on throttle from the lights
   Race.lastTs = 0; Race.acc = 0;
   Race.lastPosSeen = Race.karts.length;
   SFX.startEngine();
@@ -456,7 +456,7 @@ function buildHUD() {
   H.mapFit = paintTrackMap(H.mapBase, Race.track, { bg: '#FFFDF7' });
 
   hud.append(H.tower, H.laps, H.speed, H.map, H.center, H.toast, H.pit);
-  if (IS_TOUCH) buildTouchControls();
+  if (IS_TOUCH && typeof buildTouchControls === 'function') buildTouchControls();
   updateHUDText(true);
 }
 
@@ -609,7 +609,7 @@ function togglePause(force) {
   Race.paused = force != null ? force : !Race.paused;
   SFX.pauseEngine(Race.paused);
   let ov = document.getElementById('pause-overlay');
-  if (!Race.paused) { ov && ov.remove(); Race.lastTs = 0; if (touchApplyInput) touchApplyInput(); return; }
+  if (!Race.paused) { ov && ov.remove(); Race.lastTs = 0; if (typeof touchApplyInput === 'function') touchApplyInput(); return; }
   if (ov) return;
   const p = Race.player;
   const assistToggle = (key, label, desc) => {
