@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#FFF6E5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>KART RUNNER 3D</title>
 <style>
 @font-face {
@@ -74,8 +77,8 @@
   --mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
-* { box-sizing: border-box; }
-html, body { height: 100%; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overscroll-behavior: none; }
 body {
   margin: 0;
   font-family: var(--ui);
@@ -85,7 +88,7 @@ body {
     var(--cream);
   overflow: hidden;
 }
-button { font-family: inherit; color: inherit; cursor: pointer; }
+button { font-family: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
 button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
   outline: 3px solid var(--sky-deep); outline-offset: 2px;
 }
@@ -601,6 +604,8 @@ h1,h2,h3 { text-wrap: balance; }
 }
 #hud-pit b { color: var(--yellow); }
 
+.pause-opts { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+
 /* pause overlay */
 #pause-overlay {
   position: absolute; inset: 0; z-index: 50;
@@ -641,7 +646,7 @@ h1,h2,h3 { text-wrap: balance; }
 /* small screens */
 @media (max-width: 860px) {
   .nav { width: 74px; flex-basis: 74px; padding: 14px 8px; }
-  .nav-logo { font-size: 13px; }
+  .nav-logo { font-size: 11px; letter-spacing: .3px; padding: 4px 2px 10px; }
   .nav-logo small, .nav-item span.txt, .nav-user .meta, .nav-section { display: none; }
   .nav-item { justify-content: center; }
   .grid-3 { grid-template-columns: 1fr; }
@@ -649,6 +654,148 @@ h1,h2,h3 { text-wrap: balance; }
   .row { flex-direction: column; }
   #hud-tower { transform: scale(.85); transform-origin: top left; }
   #hud-speed { transform: scale(.85); transform-origin: bottom right; }
+}
+
+/* ============================================================
+   Mobile / touch
+   ============================================================ */
+
+/* phones in portrait: tighter menu chrome */
+@media (max-width: 520px) {
+  .main { padding: 18px 14px 60px; }
+  .h-page { font-size: 27px; }
+  .hero { padding: 22px 18px 64px; }
+  .hero h1 { font-size: 32px; }
+  .hero .sun-disc { width: 150px; height: 150px; right: -50px; top: -60px; }
+  .modal { padding: 20px 18px; }
+  .podium .step { flex: 0 0 88px; }
+}
+
+/* no-hover devices: hover lifts become no-ops so taps don't feel sticky */
+@media (hover: none) {
+  .btn:hover { transform: none; box-shadow: 0 4px 0 var(--ink); }
+  .nav-item:hover { background: transparent; }
+  .nav-item.active:hover { background: var(--yellow); }
+  .track-card:hover, .compound-card:hover, .skill-node.avail:hover { transform: none; }
+}
+
+/* comfortable tap targets */
+@media (pointer: coarse) {
+  .nav-item { padding: 11px 10px; }
+  .tabs button { padding: 9px 16px; }
+  .seg button { padding: 10px 16px; }
+  .toggle { width: 58px; height: 34px; }
+  .toggle i { width: 24px; height: 24px; }
+  .toggle.on i { left: 26px; }
+}
+
+/* race layer must own every gesture */
+html.touch #race-layer {
+  touch-action: none;
+  user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ---------------- on-screen controls ---------------- */
+#touch-controls { position: absolute; inset: 0; z-index: 45; pointer-events: none; display: none; }
+html.touch #touch-controls { display: block; }
+
+.tc-btn {
+  position: absolute; pointer-events: auto; touch-action: none;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  border: var(--outline) solid var(--ink);
+  border-radius: 50%;
+  background: rgba(255,253,247,.88);
+  color: var(--ink);
+  font-family: var(--display); letter-spacing: .5px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 0 var(--ink);
+  padding: 0;
+}
+.tc-btn.press { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); background: var(--yellow); color: var(--ink); }
+
+.tc-sl { left: max(16px, env(safe-area-inset-left)); bottom: max(16px, env(safe-area-inset-bottom)); width: 72px; height: 72px; font-size: 24px; }
+.tc-sr { left: calc(max(16px, env(safe-area-inset-left)) + 84px); bottom: max(16px, env(safe-area-inset-bottom)); width: 72px; height: 72px; font-size: 24px; }
+
+.tc-gas { right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); width: 84px; height: 84px; font-size: 15px; background: rgba(93,209,123,.92); }
+.tc-brake { right: calc(max(16px, env(safe-area-inset-right)) + 98px); bottom: max(16px, env(safe-area-inset-bottom)); width: 62px; height: 62px; font-size: 10px; background: rgba(255,77,46,.9); color: #fff; }
+.tc-drift { right: max(16px, env(safe-area-inset-right)); bottom: calc(max(16px, env(safe-area-inset-bottom)) + 96px); width: 64px; height: 64px; font-size: 11px; background: rgba(74,190,255,.92); }
+.tc-drift.big { bottom: max(16px, env(safe-area-inset-bottom)); width: 84px; height: 84px; font-size: 14px; }
+
+.tc-topbar {
+  position: absolute; top: max(12px, env(safe-area-inset-top));
+  left: 50%; transform: translateX(-50%);
+  display: flex; gap: 10px; pointer-events: none;
+}
+.tc-topbar .tc-top {
+  pointer-events: auto;
+  width: 48px; height: 42px; border-radius: 14px;
+  border: var(--outline) solid var(--ink);
+  background: rgba(255,253,247,.88);
+  box-shadow: 0 3px 0 var(--ink);
+  font-size: 15px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.tc-topbar .tc-top:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+
+/* tappable pit compound picks (touch only) */
+html.touch #hud-pit { pointer-events: auto; z-index: 47; }
+html.touch #hud-pit .pitpick { pointer-events: auto; }
+#hud-pit .pitpick {
+  margin-left: 6px; width: 34px; height: 34px; border-radius: 50%;
+  border: 2.5px solid var(--paper); background: transparent; color: var(--paper);
+  font-family: var(--display); font-size: 13px; vertical-align: middle;
+}
+#hud-pit .pitpick.on { background: var(--yellow); color: var(--ink); border-color: var(--yellow); }
+
+/* ---------------- rotate prompt ---------------- */
+#rotate-overlay { display: none; }
+@media (pointer: coarse) and (orientation: portrait) {
+  #rotate-overlay {
+    position: absolute; inset: 0; z-index: 60;
+    display: flex; align-items: center; justify-content: center;
+    background:
+      radial-gradient(circle at 1px 1px, rgba(15,14,23,.06) 1px, transparent 0) 0 0 / 22px 22px,
+      var(--cream);
+  }
+  #touch-controls { display: none !important; }
+}
+.ro-box { text-align: center; padding: 24px; }
+.ro-ico { font-size: 58px; animation: rotompt 1.6s ease-in-out infinite; }
+.ro-t { font-family: var(--display); font-size: 26px; margin-top: 14px; }
+.ro-s { color: var(--ink-3); font-weight: 600; margin-top: 6px; }
+@keyframes rotompt { 0%, 20% { transform: rotate(0); } 55%, 80% { transform: rotate(90deg); } 100% { transform: rotate(90deg); } }
+
+/* ---------------- phone-landscape HUD compaction ---------------- */
+@media (pointer: coarse) and (max-height: 500px) {
+  #hud-map { display: none; }
+  #hud-tower {
+    transform: scale(.72); transform-origin: top left;
+    left: max(10px, env(safe-area-inset-left)); top: max(10px, env(safe-area-inset-top));
+  }
+  #hud-laps {
+    transform: scale(.8); transform-origin: top right;
+    right: max(10px, env(safe-area-inset-right)); top: max(10px, env(safe-area-inset-top));
+    padding: 10px 12px;
+  }
+  #hud-speed {
+    left: 50%; right: auto; bottom: max(10px, env(safe-area-inset-bottom));
+    transform: translateX(-50%) scale(.82); transform-origin: bottom center;
+    padding: 10px 14px; gap: 12px;
+  }
+  #hud-toast { bottom: 138px; }
+  #hud-pit { bottom: 100px; max-width: 92vw; }
+  #hud-center { top: 26%; }
+  .hud-big { font-size: 54px; }
+  .hud-med { font-size: 26px; }
+
+  /* pause menu must fit a phone in landscape without scrolling */
+  #pause-overlay .modal { width: min(94vw, 880px); max-height: 94dvh; padding: 14px 20px 16px; }
+  #pause-overlay .modal h2 { font-size: 18px; }
+  #pause-overlay .pause-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  #pause-overlay .assist-row { padding: 8px 12px; }
+  #pause-overlay .assist-row .adesc { display: none; }
+  #pause-overlay .btnrow { margin-top: 12px; }
 }
 
 </style>
@@ -661,6 +808,13 @@ h1,h2,h3 { text-wrap: balance; }
 <div id="race-layer" hidden>
   <canvas id="race-canvas"></canvas>
   <div class="hud" id="hud"></div>
+  <div id="rotate-overlay">
+    <div class="ro-box">
+      <div class="ro-ico">📱</div>
+      <div class="ro-t">ROTATE YOUR PHONE</div>
+      <div class="ro-s">Racing works in landscape</div>
+    </div>
+  </div>
 </div>
 <div id="modal-root"></div>
 
@@ -4408,6 +4562,10 @@ a=extmap-allow-mixed`)!==-1){let s=i.sdp.split(`
    00-core.js — utilities, persistence, profile, ELO, season
    ============================================================ */
 
+// touch-first device? (primary pointer is coarse — phones & tablets)
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
+document.documentElement.classList.toggle('touch', IS_TOUCH);
+
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -5800,7 +5958,8 @@ class Renderer {
     this.disposables = [];
 
     this.three = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.three.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // phones: cap the backbuffer lower — fill rate is the bottleneck there
+    this.three.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_TOUCH ? 1.75 : 2));
     this.three.shadowMap.enabled = true;
     this.three.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -5881,7 +6040,8 @@ class Renderer {
     const sun = new THREE.DirectionalLight(0xfff2d8, 1.6);
     sun.position.set(60, 90, 30);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    const sm = IS_TOUCH ? 1024 : 2048;
+    sun.shadow.mapSize.set(sm, sm);
     const S = 70;
     sun.shadow.camera.left = -S; sun.shadow.camera.right = S;
     sun.shadow.camera.top = S; sun.shadow.camera.bottom = -S;
@@ -6590,6 +6750,7 @@ function startRace(cfg) {
 
   buildHUD();
   Race.active = true; Race.paused = false;
+  if (touchApplyInput) touchApplyInput();   // auto-gas: on throttle from the lights
   Race.lastTs = 0; Race.acc = 0;
   Race.lastPosSeen = Race.karts.length;
   SFX.startEngine();
@@ -6948,6 +7109,7 @@ function buildHUD() {
   H.mapFit = paintTrackMap(H.mapBase, Race.track, { bg: '#FFFDF7' });
 
   hud.append(H.tower, H.laps, H.speed, H.map, H.center, H.toast, H.pit);
+  if (IS_TOUCH) buildTouchControls();
   updateHUDText(true);
 }
 
@@ -7056,14 +7218,29 @@ function updateHUDText(force) {
     prev = k;
   }
 
-  // pit hint
+  // pit hint — on touch the compound choices are tappable chips
   const showPit = !p.finished && R.mode !== 'training' && (p.wear > 0.55 || p.pitState) && R.cfg.laps >= 5;
   H.pit.hidden = !showPit;
   if (showPit) {
-    H.pit.innerHTML = p.pitState
-      ? 'PIT CREW READY — NEXT: <b>' + COMPOUNDS[p.pitNextCompound].name + '</b>'
-      : 'TYRES AT ' + Math.round((1 - p.wear) * 100) + '% — PIT LANE BEFORE START/FINISH · NEXT SET: <b>' + COMPOUNDS[p.pitNextCompound].name + '</b> <span style="opacity:.7">[1] SOFT [2] MED [3] HARD</span>';
-  }
+    const wearPct = Math.round((1 - p.wear) * 100);
+    const sig = (p.pitState ? 'crew' : 'w' + wearPct) + '|' + p.pitNextCompound;
+    if (H.pitSig !== sig) {
+      H.pitSig = sig;
+      H.pit.innerHTML = '';
+      if (p.pitState) {
+        H.pit.append('PIT CREW READY — NEXT: ', el('b', {}, COMPOUNDS[p.pitNextCompound].name));
+      } else {
+        H.pit.append('TYRES AT ' + wearPct + '% — PIT LANE BEFORE START/FINISH · NEXT: ', el('b', {}, COMPOUNDS[p.pitNextCompound].name));
+        if (IS_TOUCH) {
+          for (const cid of ['soft', 'medium', 'hard']) H.pit.append(el('button.pitpick' + (p.pitNextCompound === cid ? '.on' : ''), {
+            onclick: () => { p.pitNextCompound = cid; SFX.click(); updateHUDText(true); },
+          }, COMPOUNDS[cid].letter));
+        } else {
+          H.pit.append(el('span', { style: { opacity: .7 } }, ' [1] SOFT [2] MED [3] HARD'));
+        }
+      }
+    }
+  } else H.pitSig = null;
 
   // minimap
   const mc = H.mapCv.getContext('2d');
@@ -7085,7 +7262,7 @@ function togglePause(force) {
   Race.paused = force != null ? force : !Race.paused;
   SFX.pauseEngine(Race.paused);
   let ov = document.getElementById('pause-overlay');
-  if (!Race.paused) { ov && ov.remove(); Race.lastTs = 0; return; }
+  if (!Race.paused) { ov && ov.remove(); Race.lastTs = 0; if (touchApplyInput) touchApplyInput(); return; }
   if (ov) return;
   const p = Race.player;
   const assistToggle = (key, label, desc) => {
@@ -7095,16 +7272,27 @@ function togglePause(force) {
     }, el('i'));
     return el('div.assist-row', {}, el('div.grow', {}, el('div.aname', {}, label), el('div.adesc', {}, desc)), t);
   };
+  const optToggle = (initial, label, desc, onFlip) => {
+    const t = el('button.toggle' + (initial ? '.on' : ''), {
+      onclick: () => onFlip(t.classList.toggle('on')),
+      'aria-label': label,
+    }, el('i'));
+    return el('div.assist-row', {}, el('div.grow', {}, el('div.aname', {}, label), el('div.adesc', {}, desc)), t);
+  };
   const online = Race.mode === 'online';
   ov = el('div', { id: 'pause-overlay' },
     el('div.modal', {},
       el('h2', {}, online ? 'RACE MENU' : 'PAUSED'),
       online ? el('p', { style: { margin: '0 0 4px', fontSize: '12.5px', color: 'var(--ink-3)' } }, 'Online race — the clock keeps running!') : null,
-      el('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' } },
+      el('div.pause-opts', {},
         assistToggle('line', 'Racing line', 'Colour-coded ideal line'),
         assistToggle('markers', 'Brake markers', 'Boards before big stops'),
         assistToggle('traction', 'Traction control', 'Cuts power when sliding'),
         assistToggle('autobrake', 'Auto-brake', 'Brakes for the corner — training wheels'),
+        optToggle(!SFX.muted, 'Sound', 'Engine & effects', on => SFX.setMuted(!on)),
+        IS_TOUCH ? optToggle(DB.settings.autogas !== false, 'Auto-gas', 'Kart accelerates by itself — hold BRAKE to slow', on => {
+          DB.settings.autogas = on; saveDB(); buildTouchControls();
+        }) : null,
       ),
       el('div.btnrow', {},
         el('button.btn.primary', { onclick: () => togglePause(false) }, online ? 'BACK TO RACE' : 'RESUME'),
@@ -8552,6 +8740,130 @@ function packPose(k) {
     Math.round(k.speed * 10) / 10, k.lap,
     Math.round(k.progress * 10) / 10, flags, Math.round(k.wear * 100),
   ];
+}
+
+'use strict';
+/* ============================================================
+   85-touch.js — on-screen race controls for touch devices
+   Writes into the shared Input object; keyboard stays untouched.
+   ============================================================ */
+
+let touchApplyInput = null;   // set while touch controls are live; used to re-sync Input after pause/blur
+let _tcCleanup = null;
+
+function buildTouchControls() {
+  if (!IS_TOUCH) return;
+  if (_tcCleanup) { _tcCleanup(); _tcCleanup = null; }
+  const old = document.getElementById('touch-controls');
+  if (old) old.remove();
+
+  const autogas = DB.settings.autogas !== false;
+  const layer = document.getElementById('race-layer');
+  const tc = el('div', { id: 'touch-controls' });
+
+  // hold buttons — pressed state is recomputed from live pointer positions,
+  // so a thumb can slide between buttons without lifting
+  const hold = {};
+  const mk = (name, spec, label) => { const b = el(spec, {}, label); hold[name] = b; return b; };
+  mk('left', 'button.tc-btn.tc-sl', '◀');
+  mk('right', 'button.tc-btn.tc-sr', '▶');
+  mk('brake', 'button.tc-btn.tc-brake', 'BRAKE');
+  if (!autogas) mk('gas', 'button.tc-btn.tc-gas', 'GAS');
+  mk('drift', 'button.tc-btn.tc-drift' + (autogas ? '.big' : ''), 'DRIFT');
+  tc.append(...Object.values(hold));
+
+  // tap buttons (rescue + pause) — plain clicks, top centre
+  tc.append(el('div.tc-topbar', {},
+    el('button.tc-top', {
+      onclick: () => {
+        if (Race.active && !Race.paused && Race.state !== 'grid') { Race.player.rescue(); SFX.blip(0); }
+      },
+      'aria-label': 'Rescue',
+    }, '⟲'),
+    el('button.tc-top', {
+      onclick: () => { SFX.click(); togglePause(); },
+      'aria-label': 'Pause',
+    }, '❚❚'),
+  ));
+  layer.append(tc);
+
+  const pressed = {};
+  const pointers = new Map();
+
+  const apply = () => {
+    if (!Race.active) return;
+    Input.left = pressed.left ? 1 : 0;
+    Input.right = pressed.right ? 1 : 0;
+    Input.brake = pressed.brake ? 1 : 0;
+    Input.drift = !!pressed.drift;
+    Input.throttle = (autogas ? !pressed.brake : !!pressed.gas) ? 1 : 0;
+  };
+  touchApplyInput = apply;
+
+  const PAD = 12; // forgiving hit box beyond the painted button
+  const recompute = () => {
+    const now = {};
+    for (const pt of pointers.values()) {
+      for (const n in hold) {
+        const r = hold[n].getBoundingClientRect();
+        if (pt.x >= r.left - PAD && pt.x <= r.right + PAD && pt.y >= r.top - PAD && pt.y <= r.bottom + PAD) now[n] = true;
+      }
+    }
+    for (const n in hold) {
+      pressed[n] = !!now[n];
+      hold[n].classList.toggle('press', pressed[n]);
+    }
+    apply();
+  };
+
+  const down = e => {
+    if (e.target.closest('.tc-topbar')) return;
+    e.preventDefault();
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    recompute();
+  };
+  const move = e => {
+    const pt = pointers.get(e.pointerId);
+    if (!pt) return;
+    pt.x = e.clientX; pt.y = e.clientY;
+    recompute();
+  };
+  const up = e => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.delete(e.pointerId);
+    recompute();
+  };
+  const noCtx = e => e.preventDefault();
+
+  tc.addEventListener('pointerdown', down);
+  tc.addEventListener('pointermove', move);
+  tc.addEventListener('pointerup', up);
+  tc.addEventListener('pointercancel', up);
+  tc.addEventListener('contextmenu', noCtx);
+
+  // browser lost focus / tab hidden — drop all touches
+  const flush = () => { pointers.clear(); recompute(); };
+  addEventListener('blur', flush);
+  document.addEventListener('visibilitychange', flush);
+
+  _tcCleanup = () => {
+    removeEventListener('blur', flush);
+    document.removeEventListener('visibilitychange', flush);
+    touchApplyInput = null;
+    tc.remove();
+  };
+
+  apply(); // with auto-gas the kart is on throttle from the start, like holding ↑
+}
+
+// portrait mid-race: the rotate overlay covers the screen — pause under it
+if (IS_TOUCH) {
+  const mq = matchMedia('(orientation: portrait)');
+  const onFlip = () => {
+    if (mq.matches && Race.active && !Race.paused && Race.state !== 'grid' && !Race.player.finished) togglePause(true);
+  };
+  if (mq.addEventListener) mq.addEventListener('change', onFlip);
+  else mq.addListener(onFlip);
 }
 
 'use strict';

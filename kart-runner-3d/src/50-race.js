@@ -97,6 +97,7 @@ function startRace(cfg) {
 
   buildHUD();
   Race.active = true; Race.paused = false;
+  if (touchApplyInput) touchApplyInput();   // auto-gas: on throttle from the lights
   Race.lastTs = 0; Race.acc = 0;
   Race.lastPosSeen = Race.karts.length;
   SFX.startEngine();
@@ -455,6 +456,7 @@ function buildHUD() {
   H.mapFit = paintTrackMap(H.mapBase, Race.track, { bg: '#FFFDF7' });
 
   hud.append(H.tower, H.laps, H.speed, H.map, H.center, H.toast, H.pit);
+  if (IS_TOUCH) buildTouchControls();
   updateHUDText(true);
 }
 
@@ -563,14 +565,29 @@ function updateHUDText(force) {
     prev = k;
   }
 
-  // pit hint
+  // pit hint — on touch the compound choices are tappable chips
   const showPit = !p.finished && R.mode !== 'training' && (p.wear > 0.55 || p.pitState) && R.cfg.laps >= 5;
   H.pit.hidden = !showPit;
   if (showPit) {
-    H.pit.innerHTML = p.pitState
-      ? 'PIT CREW READY — NEXT: <b>' + COMPOUNDS[p.pitNextCompound].name + '</b>'
-      : 'TYRES AT ' + Math.round((1 - p.wear) * 100) + '% — PIT LANE BEFORE START/FINISH · NEXT SET: <b>' + COMPOUNDS[p.pitNextCompound].name + '</b> <span style="opacity:.7">[1] SOFT [2] MED [3] HARD</span>';
-  }
+    const wearPct = Math.round((1 - p.wear) * 100);
+    const sig = (p.pitState ? 'crew' : 'w' + wearPct) + '|' + p.pitNextCompound;
+    if (H.pitSig !== sig) {
+      H.pitSig = sig;
+      H.pit.innerHTML = '';
+      if (p.pitState) {
+        H.pit.append('PIT CREW READY — NEXT: ', el('b', {}, COMPOUNDS[p.pitNextCompound].name));
+      } else {
+        H.pit.append('TYRES AT ' + wearPct + '% — PIT LANE BEFORE START/FINISH · NEXT: ', el('b', {}, COMPOUNDS[p.pitNextCompound].name));
+        if (IS_TOUCH) {
+          for (const cid of ['soft', 'medium', 'hard']) H.pit.append(el('button.pitpick' + (p.pitNextCompound === cid ? '.on' : ''), {
+            onclick: () => { p.pitNextCompound = cid; SFX.click(); updateHUDText(true); },
+          }, COMPOUNDS[cid].letter));
+        } else {
+          H.pit.append(el('span', { style: { opacity: .7 } }, ' [1] SOFT [2] MED [3] HARD'));
+        }
+      }
+    }
+  } else H.pitSig = null;
 
   // minimap
   const mc = H.mapCv.getContext('2d');
@@ -592,7 +609,7 @@ function togglePause(force) {
   Race.paused = force != null ? force : !Race.paused;
   SFX.pauseEngine(Race.paused);
   let ov = document.getElementById('pause-overlay');
-  if (!Race.paused) { ov && ov.remove(); Race.lastTs = 0; return; }
+  if (!Race.paused) { ov && ov.remove(); Race.lastTs = 0; if (touchApplyInput) touchApplyInput(); return; }
   if (ov) return;
   const p = Race.player;
   const assistToggle = (key, label, desc) => {
@@ -602,16 +619,27 @@ function togglePause(force) {
     }, el('i'));
     return el('div.assist-row', {}, el('div.grow', {}, el('div.aname', {}, label), el('div.adesc', {}, desc)), t);
   };
+  const optToggle = (initial, label, desc, onFlip) => {
+    const t = el('button.toggle' + (initial ? '.on' : ''), {
+      onclick: () => onFlip(t.classList.toggle('on')),
+      'aria-label': label,
+    }, el('i'));
+    return el('div.assist-row', {}, el('div.grow', {}, el('div.aname', {}, label), el('div.adesc', {}, desc)), t);
+  };
   const online = Race.mode === 'online';
   ov = el('div', { id: 'pause-overlay' },
     el('div.modal', {},
       el('h2', {}, online ? 'RACE MENU' : 'PAUSED'),
       online ? el('p', { style: { margin: '0 0 4px', fontSize: '12.5px', color: 'var(--ink-3)' } }, 'Online race — the clock keeps running!') : null,
-      el('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' } },
+      el('div.pause-opts', {},
         assistToggle('line', 'Racing line', 'Colour-coded ideal line'),
         assistToggle('markers', 'Brake markers', 'Boards before big stops'),
         assistToggle('traction', 'Traction control', 'Cuts power when sliding'),
         assistToggle('autobrake', 'Auto-brake', 'Brakes for the corner — training wheels'),
+        optToggle(!SFX.muted, 'Sound', 'Engine & effects', on => SFX.setMuted(!on)),
+        IS_TOUCH ? optToggle(DB.settings.autogas !== false, 'Auto-gas', 'Kart accelerates by itself — hold BRAKE to slow', on => {
+          DB.settings.autogas = on; saveDB(); buildTouchControls();
+        }) : null,
       ),
       el('div.btnrow', {},
         el('button.btn.primary', { onclick: () => togglePause(false) }, online ? 'BACK TO RACE' : 'RESUME'),

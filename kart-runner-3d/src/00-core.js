@@ -3,6 +3,10 @@
    00-core.js — utilities, persistence, profile, ELO, season
    ============================================================ */
 
+// touch-first device? (primary pointer is coarse — phones & tablets)
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
+document.documentElement.classList.toggle('touch', IS_TOUCH);
+
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;

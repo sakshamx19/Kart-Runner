@@ -215,7 +215,8 @@ class Renderer {
     this.disposables = [];
 
     this.three = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.three.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // phones: cap the backbuffer lower — fill rate is the bottleneck there
+    this.three.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_TOUCH ? 1.75 : 2));
     this.three.shadowMap.enabled = true;
     this.three.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -296,7 +297,8 @@ class Renderer {
     const sun = new THREE.DirectionalLight(0xfff2d8, 1.6);
     sun.position.set(60, 90, 30);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    const sm = IS_TOUCH ? 1024 : 2048;
+    sun.shadow.mapSize.set(sm, sm);
     const S = 70;
     sun.shadow.camera.left = -S; sun.shadow.camera.right = S;
     sun.shadow.camera.top = S; sun.shadow.camera.bottom = -S;

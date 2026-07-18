@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#FFF6E5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>KART RUNNER 3D</title>
 <link rel="stylesheet" href="src/fonts.css">
 <link rel="stylesheet" href="src/style.css">
@@ -15,6 +18,13 @@
 <div id="race-layer" hidden>
   <canvas id="race-canvas"></canvas>
   <div class="hud" id="hud"></div>
+  <div id="rotate-overlay">
+    <div class="ro-box">
+      <div class="ro-ico">📱</div>
+      <div class="ro-t">ROTATE YOUR PHONE</div>
+      <div class="ro-s">Racing works in landscape</div>
+    </div>
+  </div>
 </div>
 <div id="modal-root"></div>
 
